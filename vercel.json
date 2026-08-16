@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "https://commit-accountability.mikemaeda7.chatgpt.site/$1"
+      "destination": "https://commit.mikemaeda.com/$1"
     }
   ]
 }

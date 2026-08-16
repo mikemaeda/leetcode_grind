@@ -8,7 +8,7 @@ function escapeHtml(value: string) {
 export async function sendWaiverNotification(input: { waiverId: string; requesterName: string; requesterEmail: string; memberEmails: string[]; date: string; progress: number; explanation: string; appUrl?: string }) {
   const apiKey = runtimeValue("RESEND_API_KEY");
   const from = runtimeValue("COMMIT_EMAIL_FROM") ?? "Commit <onboarding@resend.dev>";
-  const appUrl = input.appUrl ?? runtimeValue("COMMIT_APP_URL") ?? "https://leetcode-grind-xi.vercel.app";
+  const appUrl = input.appUrl ?? runtimeValue("COMMIT_APP_URL") ?? "https://commit.mikemaeda.com";
   if (!apiKey) return { sent: false, reason: "Email notifications are not configured yet." };
   const requesterEmail = input.requesterEmail.trim().toLowerCase();
   const recipients = Array.from(new Set(input.memberEmails.map(email => email.trim().toLowerCase()).filter(email => Boolean(email) && email !== requesterEmail)));

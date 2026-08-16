@@ -1,5 +1,10 @@
 # vinext-starter
 
+## Live application
+
+- App: https://commit.mikemaeda.com
+- Owner administration: https://commit.mikemaeda.com/admin
+
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
 Drizzle support.
