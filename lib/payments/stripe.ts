@@ -9,3 +9,8 @@ export function stripeClient() {
 }
 export function stripePublishableKey() { return runtimeValue("STRIPE_PUBLISHABLE_KEY") ?? ""; }
 export function stripeWebhookSecret() { return runtimeValue("STRIPE_WEBHOOK_SECRET") ?? ""; }
+
+export function isStripeModeMismatch(error: unknown) {
+  return error instanceof Stripe.errors.StripeInvalidRequestError &&
+    (error.code === "resource_missing" || error.message.toLowerCase().includes("test mode"));
+}

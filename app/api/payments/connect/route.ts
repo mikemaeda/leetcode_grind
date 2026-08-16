@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { paymentProfiles } from "@/db/schema";
 import { currentUser } from "@/lib/auth/session";
-import { stripeClient } from "@/lib/payments/stripe";
+import { isStripeModeMismatch, stripeClient } from "@/lib/payments/stripe";
 
 export async function POST(request: Request) {
   const user = await currentUser();
@@ -22,7 +22,16 @@ export async function POST(request: Request) {
       accountId = account.id;
       await db.update(paymentProfiles).set({ connectedAccountId: accountId, updatedAt: new Date().toISOString() }).where(eq(paymentProfiles.userId, user.id));
     }
-    const link = await stripe.accountLinks.create({ account: accountId, refresh_url: `${origin}/?payment=refresh`, return_url: `${origin}/?payment=connected`, type: "account_onboarding" });
+    let link;
+    try {
+      link = await stripe.accountLinks.create({ account: accountId, refresh_url: `${origin}/?payment=refresh`, return_url: `${origin}/?payment=connected`, type: "account_onboarding" });
+    } catch (error) {
+      if (!isStripeModeMismatch(error)) throw error;
+      const account = await stripe.accounts.create({ type: "express", email: user.email, capabilities: { transfers: { requested: true } }, metadata: { commitUserId: user.id } }, { idempotencyKey: `commit-connect-${user.id}` });
+      accountId = account.id;
+      await db.update(paymentProfiles).set({ connectedAccountId: accountId, chargesEnabled: false, payoutsEnabled: false, updatedAt: new Date().toISOString() }).where(eq(paymentProfiles.userId, user.id));
+      link = await stripe.accountLinks.create({ account: accountId, refresh_url: `${origin}/?payment=refresh`, return_url: `${origin}/?payment=connected`, type: "account_onboarding" });
+    }
     return NextResponse.json({ url: link.url });
   } catch (error) {
     console.error("[payments/connect] failed", { error: error instanceof Error ? error.message : String(error) });
