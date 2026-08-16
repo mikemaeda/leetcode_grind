@@ -18,6 +18,7 @@ export async function POST(request: Request) {
   const problemTitle = String(form.get("problemTitle") ?? "").trim();
   const screenshots = form.getAll("screenshots").filter((value): value is File => value instanceof File && value.size > 0);
   if (!problemTitle) return NextResponse.json({ error: "Enter the LeetCode question title." }, { status: 400 });
+  if (problemTitle.length > 200) return NextResponse.json({ error: "Keep the question title under 200 characters." }, { status: 400 });
   if (!screenshots.length || screenshots.length > maxImages || screenshots.some(file => !file.type.startsWith("image/")) || screenshots.reduce((total, file) => total + file.size, 0) > maxUploadBytes) return NextResponse.json({ error: "Choose image files totaling less than 25 MB." }, { status: 400 });
   const db = getDb();
   const commitment = (await db.select({ id: dailyCommitments.id }).from(dailyCommitments).where(and(eq(dailyCommitments.userId, user.id), eq(dailyCommitments.groupId, LEETCODE_GROUP_ID), eq(dailyCommitments.date, date))).limit(1))[0];

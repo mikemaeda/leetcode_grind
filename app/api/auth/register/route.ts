@@ -9,7 +9,8 @@ import { sendWelcomeNotification } from "@/lib/email/welcome-notification";
 
 export async function POST(request: Request) {
   try {
-    const input = await request.json() as { name?: string; email?: string; password?: string; acceptedTerms?: boolean };
+    const input = await request.json().catch(() => null) as { name?: string; email?: string; password?: string; acceptedTerms?: boolean } | null;
+    if (!input) return NextResponse.json({ error: "Enter a valid name, email, and password of at least 8 characters." }, { status: 400 });
     const name = input.name?.trim(), email = input.email?.trim().toLowerCase(), password = input.password ?? "";
     if (!name || !email || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return NextResponse.json({ error: "Enter a valid name, email, and password of at least 8 characters." }, { status: 400 });
     if (input.acceptedTerms !== true) return NextResponse.json({ error: "You must explicitly agree to the LeetCode Grind commitment terms." }, { status: 400 });

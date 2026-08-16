@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-html-link-for-pages */
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { emailDeliveries, groupMembers, problemSubmissions, securityEvents, users, violationCharges } from "@/db/schema";
 import { currentAdmin } from "@/lib/admin";
@@ -12,7 +12,7 @@ export default async function AdminPage() {
   if (!admin) return <main className="admin-page"><h1>Admin access required</h1><a href="/">Return to Commit</a></main>;
   const db = getDb();
   const [members, submissions, payments, events, emails] = await Promise.all([
-    db.select({ id: users.id, name: users.name, email: users.email, role: groupMembers.role }).from(groupMembers).innerJoin(users, eq(users.id, groupMembers.userId)).where(eq(groupMembers.groupId, LEETCODE_GROUP_ID)),
+    db.select({ id: users.id, name: users.name, email: users.email, role: groupMembers.role }).from(groupMembers).innerJoin(users, eq(users.id, groupMembers.userId)).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt))),
     db.select({ id: problemSubmissions.id, title: problemSubmissions.problemTitle, email: users.email, submittedAt: problemSubmissions.submittedAt }).from(problemSubmissions).innerJoin(users, eq(users.id, problemSubmissions.userId)).orderBy(desc(problemSubmissions.submittedAt)).limit(30),
     db.select().from(violationCharges).orderBy(desc(violationCharges.createdAt)).limit(30),
     db.select().from(securityEvents).orderBy(desc(securityEvents.createdAt)).limit(50),

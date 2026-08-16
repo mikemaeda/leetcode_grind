@@ -8,7 +8,8 @@ import { TERMS_VERSION } from "@/lib/domain/leetcode-group";
 import { recordSecurityEvent } from "@/lib/security/events";
 
 export async function POST(request: Request) {
-  const input = await request.json() as { email?: string; password?: string; acceptedTerms?: boolean };
+  const input = await request.json().catch(() => null) as { email?: string; password?: string; acceptedTerms?: boolean } | null;
+  if (!input) return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
   const email = input.email?.trim().toLowerCase(), password = input.password ?? "";
   if (!email || !password) return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
   const recentFailures = (await getDb().select({ value: count() }).from(securityEvents).where(and(eq(securityEvents.email, email), eq(securityEvents.type, "LOGIN_FAILED"), gte(securityEvents.createdAt, new Date(Date.now() - 15 * 60_000).toISOString()))))[0]?.value ?? 0;

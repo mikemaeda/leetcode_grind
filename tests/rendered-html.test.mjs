@@ -59,3 +59,18 @@ test("stores screenshot proof and renders real daily progress", async () => {
   assert.match(page, /problemSubmissions/);
   assert.match(page, /ownProgress/);
 });
+
+test("protects malformed auth requests, upload metadata, and proof privacy", async () => {
+  const [login, register, submissions, proofs, admin] = await Promise.all([
+    readFile(new URL("../app/api/auth/login/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/register/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/submissions/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/proofs/[id]/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(login, /request\.json\(\)\.catch/);
+  assert.match(register, /request\.json\(\)\.catch/);
+  assert.match(submissions, /problemTitle\.length > 200/);
+  assert.match(proofs, /isNull\(groupMembers\.leftAt\)/);
+  assert.match(admin, /isNull\(groupMembers\.leftAt\)/);
+});
