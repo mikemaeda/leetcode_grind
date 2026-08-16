@@ -3,16 +3,20 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("requires explicit commitment terms during authentication", async () => {
-  const [screen, register, login] = await Promise.all([
+  const [screen, register, login, welcomeEmail] = await Promise.all([
     readFile(new URL("../app/AuthScreen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/register/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/login/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/email/welcome-notification.ts", import.meta.url), "utf8"),
   ]);
   assert.match(screen, /acceptedTerms/);
   assert.match(screen, /two LeetCode questions by 11:59 PM ET/);
   assert.match(screen, /\$10 charge for each other eligible member/);
   assert.match(register, /input\.acceptedTerms !== true/);
   assert.match(login, /input\.acceptedTerms !== true/);
+  assert.match(register, /sendWelcomeNotification/);
+  assert.match(welcomeEmail, /subject: "Welcome to Commit"/);
+  assert.match(welcomeEmail, /`welcome-\$\{input\.userId\}`/);
 });
 
 test("requires a 300-word waiver and unanimous member approval", async () => {

@@ -5,6 +5,7 @@ import { authAccounts, authSessions, users } from "@/db/schema";
 import { hashPassword, hashToken } from "@/lib/auth/password";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 import { TERMS_VERSION } from "@/lib/domain/leetcode-group";
+import { sendWelcomeNotification } from "@/lib/email/welcome-notification";
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +24,12 @@ export async function POST(request: Request) {
       db.insert(authAccounts).values({ id: accountId, userId, passwordHash: credentials.hash, passwordSalt: credentials.salt, createdAt: now.toISOString() }),
       db.insert(authSessions).values({ id: crypto.randomUUID(), userId, tokenHash: sessionHash, createdAt: now.toISOString(), expiresAt: expiresAt.toISOString() }),
     ]);
+    const welcomeEmail = await sendWelcomeNotification({ userId, memberName: name, memberEmail: email, appUrl: new URL(request.url).origin }).catch(error => {
+      console.error("[welcome-email] notification failed", { userId, error: error instanceof Error ? error.message : String(error) });
+      return { sent: false as const };
+    });
     const response = NextResponse.json({ ok: true });
+    response.headers.set("x-welcome-email-sent", welcomeEmail.sent ? "true" : "false");
     response.cookies.set(SESSION_COOKIE, sessionToken, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires: expiresAt });
     return response;
   } catch (error) {
