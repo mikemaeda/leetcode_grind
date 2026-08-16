@@ -5,7 +5,7 @@ function fromBase64(value: string) { return Uint8Array.from(atob(value), char =>
 
 export async function hashPassword(password: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
   const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 210_000 }, material, 256);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100_000 }, material, 256);
   return { hash: toBase64(new Uint8Array(bits)), salt: toBase64(salt) };
 }
 
