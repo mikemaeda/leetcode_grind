@@ -88,8 +88,9 @@ test("keeps successful actions on the current view with confirmation", async () 
 });
 
 test("requires card and payout setup before proof submission", async () => {
-  const [status, route, page, app] = await Promise.all([
+  const [status, sync, route, page, app] = await Promise.all([
     readFile(new URL("../lib/payments/commitment-status.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/payments/sync-stripe.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/submissions/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/AccountabilityApp.tsx", import.meta.url), "utf8"),
@@ -97,9 +98,27 @@ test("requires card and payout setup before proof submission", async () => {
   assert.match(status, /paymentMethods\.status, "ACTIVE"/);
   assert.match(status, /payoutsEnabled/);
   assert.match(status, /complete: hasCard && payoutsReady/);
+  assert.match(sync, /setupIntents\.retrieve/);
+  assert.match(sync, /intent\.metadata\.commitUserId !== userId/);
+  assert.match(sync, /accounts\.retrieve/);
   assert.match(route, /if \(!paymentSetup\.complete\)/);
   assert.match(route, /status: 403/);
   assert.match(page, /paymentSetup=\{paymentSetup\}/);
   assert.match(app, /Commitment setup incomplete/);
   assert.match(app, /Unlock submissions/);
+});
+
+test("schedules retry-safe automatic violation evaluation", async () => {
+  const [workflow, route, processor] = await Promise.all([
+    readFile(new URL("../.github/workflows/evaluate-commitments.yml", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/jobs/evaluate-violations/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/payments/process-violation.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(workflow, /cron: "\*\/5 \* \* \* \*"/);
+  assert.match(workflow, /secrets\.COMMIT_CRON_SECRET/);
+  assert.match(route, /lte\(dailyCommitments\.deadline, now\)/);
+  assert.match(route, /eq\(dailyCommitments\.status, "WAIVER_PENDING"\)/);
+  assert.match(processor, /violation-charge-\$\{commitmentId\}/);
+  assert.match(processor, /violation-transfer-\$\{commitmentId\}-\$\{recipient\.userId\}/);
+  assert.match(processor, /source_transaction: chargeId/);
 });

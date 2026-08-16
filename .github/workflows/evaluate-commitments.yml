@@ -1,0 +1,25 @@
+name: Evaluate overdue commitments
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: evaluate-overdue-commitments
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      COMMIT_CRON_SECRET: ${{ secrets.COMMIT_CRON_SECRET }}
+    steps:
+      - name: Charge and distribute confirmed violations
+        if: env.COMMIT_CRON_SECRET != ''
+        run: |
+          curl --fail-with-body --retry 2 --max-time 120 \
+            -X POST \
+            -H "Authorization: Bearer $COMMIT_CRON_SECRET" \
+            https://commit.mikemaeda.com/api/jobs/evaluate-violations

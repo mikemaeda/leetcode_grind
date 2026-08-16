@@ -1,8 +1,9 @@
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { paymentMethods, paymentProfiles } from "@/db/schema";
+import { paymentProfiles } from "@/db/schema";
 import { stripeClient, stripeWebhookSecret } from "@/lib/payments/stripe";
+import { syncSetupIntent } from "@/lib/payments/sync-stripe";
 
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
@@ -14,11 +15,8 @@ export async function POST(request: Request) {
   const db = getDb();
   if (event.type === "setup_intent.succeeded") {
     const intent = event.data.object;
-    const userId = intent.metadata.commitUserId, paymentMethodId = typeof intent.payment_method === "string" ? intent.payment_method : intent.payment_method?.id;
-    if (userId && paymentMethodId) {
-      const method = await stripeClient().paymentMethods.retrieve(paymentMethodId);
-      if (method.card) await db.insert(paymentMethods).values({ id: crypto.randomUUID(), userId, provider: "stripe", providerCustomerId: String(method.customer), providerPaymentMethodId: method.id, brand: method.card.brand, last4: method.card.last4, expiryMonth: method.card.exp_month, expiryYear: method.card.exp_year, status: "ACTIVE", createdAt: new Date().toISOString() }).onConflictDoUpdate({ target: [paymentMethods.provider, paymentMethods.providerPaymentMethodId], set: { brand: method.card.brand, last4: method.card.last4, expiryMonth: method.card.exp_month, expiryYear: method.card.exp_year, status: "ACTIVE" } });
-    }
+    const userId = intent.metadata.commitUserId;
+    if (userId) await syncSetupIntent(userId, intent.id);
   }
   if (event.type === "account.updated") {
     const account = event.data.object;
