@@ -27,6 +27,8 @@ test("requires a 300-word waiver and unanimous member approval", async () => {
   assert.match(voteRoute, /eligibleVoterIds\.every/);
   assert.match(app, /\/ 300 words/);
   assert.match(app, /Every other active member must approve/);
+  assert.match(app, /Today is complete/);
+  assert.match(app, /!complete && <button className="primary" onClick=\{onRequest\}/);
 });
 
 test("stores screenshot proof and renders real daily progress", async () => {
