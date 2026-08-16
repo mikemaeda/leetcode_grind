@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { getChatGPTUser } from "./chatgpt-auth";
 import { AccountabilityApp } from "./AccountabilityApp";
+import { AuthScreen } from "./AuthScreen";
+import { currentUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const user = await getChatGPTUser();
-  return <AccountabilityApp viewerName={user?.fullName?.split(" ")[0] ?? "Mike"} signedIn={Boolean(user)} />;
+  const user = await currentUser();
+  if (!user) return <AuthScreen />;
+  return <AccountabilityApp viewerName={user.name.split(" ")[0]} />;
 }
