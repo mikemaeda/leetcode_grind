@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { dailyCommitments, groupMembers, users, waiverRequests, waiverVotes } from "@/db/schema";
 import { ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
 import { sendWaiverAcceptedNotification } from "@/lib/email/waiver-accepted-notification";
+import { sendWaiverRejectedNotifications } from "@/lib/email/waiver-rejected-notification";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
@@ -18,7 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!waiver) return NextResponse.json({ error: "Waiver request not found." }, { status: 404 });
   if (waiver.requesterId === user.id) return NextResponse.json({ error: "You cannot vote on your own waiver." }, { status: 403 });
   if (waiver.status !== "PENDING") return NextResponse.json({ error: "Voting on this request has closed." }, { status: 409 });
-  const eligible = await db.select({ userId: groupMembers.userId }).from(groupMembers).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt)));
+  const eligible = await db.select({ userId: groupMembers.userId, email: users.email }).from(groupMembers).innerJoin(users, eq(users.id, groupMembers.userId)).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt)));
   if (!eligible.some(member => member.userId === user.id)) return NextResponse.json({ error: "Only active group members can vote." }, { status: 403 });
 
   const previousVote = (await db.select({ vote: waiverVotes.vote }).from(waiverVotes).where(and(eq(waiverVotes.waiverId, id), eq(waiverVotes.voterId, user.id))).limit(1))[0]?.vote;
@@ -46,5 +47,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       requesterNotified = notification.sent;
     }
   }
-  return NextResponse.json({ status, approvals: votes.filter(vote => vote.vote === "APPROVE" && eligibleVoterIds.includes(vote.voterId)).length, required: eligibleVoterIds.length, requesterNotified });
+  let rejectionRecipientCount = 0;
+  if (input.vote === "REJECT" && previousVote !== "REJECT") {
+    const requester = (await db.select({ name: users.name }).from(users).where(eq(users.id, waiver.requesterId)).limit(1))[0];
+    if (requester) {
+      const notification = await sendWaiverRejectedNotifications({ waiverId: id, requesterName: requester.name, voterName: user.name, date: waiver.date, recipients: eligible.map(member => ({ id: member.userId, email: member.email })), appUrl: new URL(request.url).origin }).catch(error => {
+        console.error("[waiver-rejected-email] notification failed", { waiverId: id, voterId: user.id, error: error instanceof Error ? error.message : String(error) });
+        return { sent: false as const, recipientCount: 0 };
+      });
+      rejectionRecipientCount = notification.recipientCount;
+    }
+  }
+  return NextResponse.json({ status, approvals: votes.filter(vote => vote.vote === "APPROVE" && eligibleVoterIds.includes(vote.voterId)).length, required: eligibleVoterIds.length, requesterNotified, rejectionRecipientCount });
 }
