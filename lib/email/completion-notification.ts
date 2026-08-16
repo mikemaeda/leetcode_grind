@@ -1,4 +1,5 @@
 import { runtimeValue } from "@/lib/payments/stripe";
+import { recordEmailDelivery } from "./delivery-tracking";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
@@ -17,6 +18,7 @@ export async function sendCompletionNotification(input: { commitmentId: string; 
       from,
       to: [input.memberEmail],
       subject: "You completed today’s 2 LeetCode questions",
+      text: `Congratulations, ${input.memberName}! You completed both LeetCode questions for ${input.date}. Your progress is 2/2. View Commit: ${appUrl}`,
       html: `<h2>Congratulations, ${escapeHtml(input.memberName)}!</h2><p>You completed both LeetCode questions for ${escapeHtml(input.date)}.</p><p>Your progress is now <strong>2/2</strong>, and today’s commitment is complete.</p><p><a href="${escapeHtml(appUrl)}">View today’s progress in Commit</a></p>`,
     }),
   });
@@ -25,5 +27,7 @@ export async function sendCompletionNotification(input: { commitmentId: string; 
     console.error("[completion-email] Resend rejected notification", { commitmentId: input.commitmentId, status: response.status, detail: detail.slice(0, 300) });
     return { sent: false, reason: "The completion email could not be delivered." };
   }
+  const result = await response.json() as { id?: string };
+  await recordEmailDelivery({ providerEmailId: result.id, recipient: input.memberEmail, kind: "COMPLETION", status: "SENT" });
   return { sent: true as const };
 }

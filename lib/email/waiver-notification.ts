@@ -1,4 +1,5 @@
 import { runtimeValue } from "@/lib/payments/stripe";
+import { recordEmailDelivery } from "./delivery-tracking";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
@@ -21,10 +22,15 @@ export async function sendWaiverNotification(input: { waiverId: string; requeste
         from,
         to: [recipient],
         subject: `${input.requesterName} requested a LeetCode waiver`,
+        text: `${input.requesterName} requested a waiver for ${input.date} with progress ${input.progress}/2. Your vote is required. Explanation: ${input.explanation}\n\nReview and vote: ${appUrl}`,
         html: `<h2>${escapeHtml(input.requesterName)} requested a waiver</h2><p><strong>Date:</strong> ${escapeHtml(input.date)}</p><p><strong>Progress:</strong> ${input.progress}/2 questions</p><p><strong>Account:</strong> ${escapeHtml(input.requesterEmail)}</p><h3>Explanation</h3><p style="white-space:pre-wrap">${escapeHtml(input.explanation)}</p><p>Your vote is required. Every active member other than the requester must approve this waiver.</p><p><a href="${escapeHtml(appUrl)}">Review and vote in Commit</a></p>`,
       }),
     });
-    if (response.ok) return true;
+    if (response.ok) {
+      const result = await response.json() as { id?: string };
+      await recordEmailDelivery({ providerEmailId: result.id, recipient, kind: "WAIVER", status: "SENT" });
+      return true;
+    }
     const detail = await response.text();
     console.error("[waiver-email] Resend rejected notification", { waiverId: input.waiverId, recipient, status: response.status, detail: detail.slice(0, 300) });
     return false;
