@@ -3,7 +3,9 @@ import { AccountabilityApp } from "./AccountabilityApp";
 import { AuthScreen } from "./AuthScreen";
 import { currentUser } from "@/lib/auth/session";
 import { getDb } from "@/db";
-import { users } from "@/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { dailyCommitments, groupMembers, problemSubmissions, proofUploads, streaks, users } from "@/db/schema";
+import { ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,10 @@ export const metadata: Metadata = {
 export default async function Home() {
   const user = await currentUser();
   if (!user) return <AuthScreen />;
-  const registeredUsers = await getDb().select({ id: users.id, name: users.name }).from(users);
-  return <AccountabilityApp viewerName={user.name} viewerEmail={user.email} members={registeredUsers} />;
+  const { date } = await ensureLeetcodeMembership(user);
+  const db = getDb();
+  const registeredUsers = await db.select({ id: users.id, name: users.name, progress: dailyCommitments.completedCount, status: dailyCommitments.status, streak: streaks.currentStreak }).from(groupMembers).innerJoin(users, eq(users.id, groupMembers.userId)).leftJoin(dailyCommitments, and(eq(dailyCommitments.userId, users.id), eq(dailyCommitments.groupId, LEETCODE_GROUP_ID), eq(dailyCommitments.date, date))).leftJoin(streaks, and(eq(streaks.userId, users.id), eq(streaks.groupId, LEETCODE_GROUP_ID))).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt)));
+  const submissions = await db.select({ id: problemSubmissions.id, memberId: users.id, memberName: users.name, problemTitle: problemSubmissions.problemTitle, leetcodeUrl: problemSubmissions.leetcodeUrl, submittedAt: problemSubmissions.submittedAt, proofUrl: proofUploads.imageUrl, verificationStatus: proofUploads.verificationStatus }).from(problemSubmissions).innerJoin(users, eq(users.id, problemSubmissions.userId)).innerJoin(dailyCommitments, eq(dailyCommitments.id, problemSubmissions.commitmentId)).innerJoin(proofUploads, eq(proofUploads.submissionId, problemSubmissions.id)).where(and(eq(dailyCommitments.groupId, LEETCODE_GROUP_ID), eq(dailyCommitments.date, date))).orderBy(problemSubmissions.submittedAt);
+  const ownProgress = registeredUsers.find(member => member.id === user.id)?.progress ?? 0;
+  return <AccountabilityApp viewerName={user.name} viewerEmail={user.email} viewerId={user.id} members={registeredUsers.map(member => ({ ...member, progress: member.progress ?? 0, status: member.status ?? "PENDING", streak: member.streak ?? 0 }))} submissions={submissions} ownProgress={ownProgress} />;
 }
