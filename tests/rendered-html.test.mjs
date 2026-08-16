@@ -15,6 +15,20 @@ test("requires explicit commitment terms during authentication", async () => {
   assert.match(login, /input\.acceptedTerms !== true/);
 });
 
+test("requires a 300-word waiver and unanimous member approval", async () => {
+  const [requestRoute, voteRoute, app] = await Promise.all([
+    readFile(new URL("../app/api/waivers/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/waivers/[id]/vote/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/AccountabilityApp.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(requestRoute, /wordCount\(explanation\) < 300/);
+  assert.match(requestRoute, /sendWaiverNotification/);
+  assert.match(voteRoute, /waiver\.requesterId === user\.id/);
+  assert.match(voteRoute, /eligibleVoterIds\.every/);
+  assert.match(app, /\/ 300 words/);
+  assert.match(app, /Every other active member must approve/);
+});
+
 test("stores screenshot proof and renders real daily progress", async () => {
   const [route, app, page] = await Promise.all([
     readFile(new URL("../app/api/submissions/route.ts", import.meta.url), "utf8"),
