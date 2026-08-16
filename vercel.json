@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "https://commit-accountability.mikemaeda7.chatgpt.site/$1"
+    }
+  ]
+}
