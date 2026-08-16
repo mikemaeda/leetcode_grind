@@ -16,9 +16,8 @@ export async function POST(request: Request) {
   const { date } = await ensureLeetcodeMembership(user);
   const form = await request.formData();
   const problemTitle = String(form.get("problemTitle") ?? "").trim();
-  const leetcodeUrl = String(form.get("leetcodeUrl") ?? "").trim();
   const screenshots = form.getAll("screenshots").filter((value): value is File => value instanceof File && value.size > 0);
-  if (!problemTitle || !/^https:\/\/(www\.)?leetcode\.com\/problems\//i.test(leetcodeUrl)) return NextResponse.json({ error: "Enter the question title and a valid LeetCode problem URL." }, { status: 400 });
+  if (!problemTitle) return NextResponse.json({ error: "Enter the LeetCode question title." }, { status: 400 });
   if (!screenshots.length || screenshots.length > maxImages || screenshots.some(file => !allowedTypes.has(file.type) || file.size > maxImageBytes)) return NextResponse.json({ error: "Choose 1–3 PNG, JPG, WEBP, GIF, or AVIF images, up to 10 MB each." }, { status: 400 });
   const db = getDb();
   const commitment = (await db.select({ id: dailyCommitments.id }).from(dailyCommitments).where(and(eq(dailyCommitments.userId, user.id), eq(dailyCommitments.groupId, LEETCODE_GROUP_ID), eq(dailyCommitments.date, date))).limit(1))[0];
@@ -36,7 +35,7 @@ export async function POST(request: Request) {
   await Promise.all(proofs.map(proof => env.PROOFS.put(proof.objectKey, proof.file.arrayBuffer(), { httpMetadata: { contentType: proof.file.type } })));
   try {
     await db.batch([
-      db.insert(problemSubmissions).values({ id: submissionId, commitmentId: commitment.id, userId: user.id, problemTitle, leetcodeUrl, notes: null, submittedAt }),
+      db.insert(problemSubmissions).values({ id: submissionId, commitmentId: commitment.id, userId: user.id, problemTitle, leetcodeUrl: "", notes: null, submittedAt }),
       ...proofs.map(proof => db.insert(proofUploads).values({ id: proof.id, submissionId, objectKey: proof.objectKey, imageUrl: `/api/proofs/${proof.id}`, uploadedAt: submittedAt, verificationStatus: "UNVERIFIED" })),
       db.update(dailyCommitments).set({ completedCount: currentCount + 1, status: currentCount + 1 >= DAILY_REQUIRED ? "COMPLETED" : "PENDING", completedAt: currentCount + 1 >= DAILY_REQUIRED ? submittedAt : null }).where(eq(dailyCommitments.id, commitment.id)),
     ]);
