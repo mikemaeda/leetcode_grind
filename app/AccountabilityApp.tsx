@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
@@ -12,6 +13,7 @@ type Waiver = { id: string; requesterId: string; requesterName: string; date: st
 const initials = (name: string) => name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
 
 export function AccountabilityApp({ viewerName, viewerEmail, viewerId, members, submissions, waivers, ownProgress }: { viewerName: string; viewerEmail: string; viewerId: string; members: Member[]; submissions: Submission[]; waivers: Waiver[]; ownProgress: number }) {
+  const router = useRouter();
   const [view, setView] = useState<View>("Today");
   const [submitOpen, setSubmitOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
@@ -31,14 +33,14 @@ export function AccountabilityApp({ viewerName, viewerEmail, viewerId, members, 
       {view === "Today" && <Today name={viewerName.split(" ")[0]} members={members} ownProgress={ownProgress} onSubmit={() => setSubmitOpen(true)} onWaiver={() => setWaiverOpen(true)} onMembers={() => setView("Members")} />}
       {view === "Members" && <Members members={members} viewerEmail={viewerEmail} />}
       {view === "Submissions" && <Submissions submissions={submissions} viewerId={viewerId} />}
-      {view === "Waivers" && <Waivers waivers={waivers} viewerId={viewerId} ownProgress={ownProgress} onRequest={() => setWaiverOpen(true)} />}
+      {view === "Waivers" && <Waivers waivers={waivers} viewerId={viewerId} ownProgress={ownProgress} onRequest={() => setWaiverOpen(true)} onSuccess={message => { setToast(message); router.refresh(); }} />}
       {view === "Payment" && <Payment onAdd={() => setCardOpen(true)} />}
     </main>
 
-    {submitOpen && <SubmitDialog onClose={() => setSubmitOpen(false)} onDone={(count, completionEmailSent) => { setSubmitOpen(false); setToast(`Proof saved. Today’s progress is ${count}/2.${completionEmailSent ? " A congratulations email was sent." : ""}`); window.setTimeout(() => window.location.reload(), 500); }} />}
+    {submitOpen && <SubmitDialog onClose={() => setSubmitOpen(false)} onDone={(count, completionEmailSent) => { setSubmitOpen(false); setToast(`Proof saved. Today’s progress is ${count}/2.${completionEmailSent ? " A congratulations email was sent." : ""}`); router.refresh(); }} />}
     {cardOpen && <CardDialog onClose={() => setCardOpen(false)} />}
-    {waiverOpen && <WaiverDialog onClose={() => setWaiverOpen(false)} onDone={message => { setWaiverOpen(false); setToast(message); window.setTimeout(() => window.location.reload(), 700); }} />}
-    {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
+    {waiverOpen && <WaiverDialog onClose={() => setWaiverOpen(false)} onDone={message => { setWaiverOpen(false); setToast(message); router.refresh(); }} />}
+    {toast && <div className="toast success-toast" role="status" aria-live="polite"><span>✓</span>{toast}</div>}
   </div>;
 }
 
@@ -59,9 +61,9 @@ function MemberRow({ member }: { member: Member }) { const progress = Math.min(m
 
 function Submissions({ submissions, viewerId }: { submissions: Submission[]; viewerId: string }) { const grouped = submissions.reduce<Record<string, { name: string; items: Submission[] }>>((all, item) => { (all[item.memberId] ??= { name: item.memberName, items: [] }).items.push(item); return all; }, {}); return <div className="grind-page"><div className="grind-title"><p>PROOF</p><h1>Submissions</h1><span>Review the screenshots group members submitted today.</span></div>{submissions.length ? <div className="submission-groups">{Object.entries(grouped).map(([memberId, group]) => <section className="submission-group" key={memberId}><div className="submission-owner"><span className="avatar blue">{initials(group.name)}</span><div><b>{group.name}{memberId === viewerId ? " (you)" : ""}</b><small>{group.items.length} / 2 questions submitted today</small></div></div><div className="proof-grid">{group.items.map(item => <article className="proof-card" key={item.id}><div className={`submitted-proof-images ${item.proofUrls.length > 1 ? "multiple" : ""}`}>{item.proofUrls.map((url, index) => <a href={url} target="_blank" rel="noreferrer" key={url}><img src={url} alt={`${item.problemTitle} proof ${index + 1} submitted by ${item.memberName}`} /></a>)}</div><div><b>{item.problemTitle}</b><small>{item.proofUrls.length} {item.proofUrls.length === 1 ? "image" : "images"} · {new Date(item.submittedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · Awaiting group review</small></div></article>)}</div></section>)}</div> : <section className="plain-section"><div className="calm-empty"><b>No screenshots submitted today.</b><span>Accepted LeetCode proof will appear here under the member who submitted it.</span></div></section>}</div>; }
 
-function Waivers({ waivers, viewerId, ownProgress, onRequest }: { waivers: Waiver[]; viewerId: string; ownProgress: number; onRequest: () => void }) {
+function Waivers({ waivers, viewerId, ownProgress, onRequest, onSuccess }: { waivers: Waiver[]; viewerId: string; ownProgress: number; onRequest: () => void; onSuccess: (message: string) => void }) {
   const [savingId, setSavingId] = useState(""), [error, setError] = useState("");
-  async function vote(id: string, choice: "APPROVE" | "REJECT") { setSavingId(id); setError(""); const response = await fetch(`/api/waivers/${id}/vote`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vote: choice }) }); const result = await response.json().catch(() => ({ error: "Your vote could not be saved." })) as { error?: string }; if (!response.ok) { setError(result.error ?? "Your vote could not be saved."); setSavingId(""); return; } window.location.reload(); }
+  async function vote(id: string, choice: "APPROVE" | "REJECT") { setSavingId(id); setError(""); const response = await fetch(`/api/waivers/${id}/vote`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vote: choice }) }); const result = await response.json().catch(() => ({ error: "Your vote could not be saved." })) as { error?: string }; if (!response.ok) { setError(result.error ?? "Your vote could not be saved."); setSavingId(""); return; } setSavingId(""); onSuccess(choice === "APPROVE" ? "Waiver approved. The requester has been notified." : "Waiver rejected. Your vote was saved."); }
   const complete = ownProgress >= 2;
   return <div className="grind-page"><div className="grind-title waiver-title"><div><p>EXCEPTIONS</p><h1>Waiver requests</h1><span>A missed day is waived only when every other active member approves.</span></div>{!complete && <button className="primary" onClick={onRequest}>Request today’s waiver</button>}</div>{complete && <div className="waiver-complete" role="status"><b>Today is complete.</b><span>You submitted 2/2 questions, so you do not need a waiver.</span></div>}{error && <div className="auth-error waiver-error" role="alert">{error}</div>}{waivers.length ? <div className="waiver-list">{waivers.map(waiver => { const approvals = waiver.votes.filter(vote => vote.vote === "APPROVE" && waiver.eligibleVoterIds.includes(vote.voterId)).length; const viewerVote = waiver.votes.find(vote => vote.voterId === viewerId)?.vote; const canVote = waiver.status === "PENDING" && waiver.requesterId !== viewerId && waiver.eligibleVoterIds.includes(viewerId); return <article className="waiver-request" key={waiver.id}><div className="waiver-request-head"><div><b>{waiver.requesterName}{waiver.requesterId === viewerId ? " (you)" : ""}</b><small>{waiver.progress}/2 completed · requested {new Date(waiver.submittedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small></div><span className={`status ${waiver.status === "APPROVED" ? "success" : "pending"}`}>{waiver.status}</span></div><p>{waiver.explanation}</p><div className="waiver-votes"><b>{approvals} / {waiver.eligibleVoterIds.length} approvals</b><span>{waiver.eligibleVoterIds.length === 0 ? "Another member must join before this can be approved." : waiver.votes.length ? waiver.votes.map(vote => `${vote.voterName}: ${vote.vote.toLowerCase()}`).join(" · ") : "No votes yet."}</span></div>{canVote && <div className="waiver-actions"><button className="primary" disabled={savingId === waiver.id} onClick={() => vote(waiver.id, "APPROVE")}>{viewerVote === "APPROVE" ? "Approved" : "Approve waiver"}</button><button className="outline" disabled={savingId === waiver.id} onClick={() => vote(waiver.id, "REJECT")}>{viewerVote === "REJECT" ? "Rejected" : "Reject waiver"}</button></div>}{waiver.requesterId === viewerId && waiver.status === "PENDING" && <small className="waiver-pending-copy">Pending approval. The normal missed-day consequence still applies unless everyone approves before the deadline.</small>}</article>; })}</div> : <section className="plain-section"><div className="calm-empty"><b>No waiver requests today.</b><span>{complete ? "Your commitment is complete. Other members’ requests will appear here." : "A member who cannot complete two questions can submit a 300-word explanation for group approval."}</span></div></section>}</div>;
 }

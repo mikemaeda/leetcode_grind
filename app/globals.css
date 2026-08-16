@@ -102,3 +102,4 @@
   .simple-member .member-progress{grid-column:2}
   .proof-preview{grid-template-columns:1fr}
 }
+.success-toast{border:1px solid #0f5f3f;background:#176c4c;color:#fff}.success-toast span{background:#fff;color:#176c4c}

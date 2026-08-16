@@ -74,3 +74,13 @@ test("protects malformed auth requests, upload metadata, and proof privacy", asy
   assert.match(proofs, /isNull\(groupMembers\.leftAt\)/);
   assert.match(admin, /isNull\(groupMembers\.leftAt\)/);
 });
+
+test("keeps successful actions on the current view with confirmation", async () => {
+  const app = await readFile(new URL("../app/AccountabilityApp.tsx", import.meta.url), "utf8");
+  assert.match(app, /useRouter/);
+  assert.match(app, /router\.refresh\(\)/);
+  assert.match(app, /Waiver approved\. The requester has been notified\./);
+  assert.match(app, /Waiver rejected\. Your vote was saved\./);
+  assert.doesNotMatch(app, /setTimeout\(\(\) => window\.location\.reload/);
+  assert.match(app, /success-toast/);
+});
