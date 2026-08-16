@@ -4,10 +4,10 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
 }
 
-export async function sendCompletionNotification(input: { commitmentId: string; memberName: string; memberEmail: string; date: string }) {
+export async function sendCompletionNotification(input: { commitmentId: string; memberName: string; memberEmail: string; date: string; appUrl?: string }) {
   const apiKey = runtimeValue("RESEND_API_KEY");
   const from = runtimeValue("COMMIT_EMAIL_FROM") ?? "Commit <onboarding@resend.dev>";
-  const appUrl = runtimeValue("COMMIT_APP_URL") ?? "https://leetcode-grind-mikemaedas-projects.vercel.app";
+  const appUrl = input.appUrl ?? runtimeValue("COMMIT_APP_URL") ?? "https://leetcode-grind-xi.vercel.app";
   if (!apiKey) return { sent: false, reason: "Email notifications are not configured yet." };
 
   const response = await fetch("https://api.resend.com/emails", {

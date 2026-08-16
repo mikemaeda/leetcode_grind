@@ -31,8 +31,9 @@ test("requires a 300-word waiver and unanimous member approval", async () => {
   assert.match(app, /Today is complete/);
   assert.match(app, /!complete && <button className="primary" onClick=\{onRequest\}/);
   assert.match(requestRoute, /activeMembers\.map\(member => member\.email\)/);
-  assert.match(email, /bcc: memberCopies/);
-  assert.match(email, /new Set\(\[WAIVER_INBOX, \.\.\.input\.memberEmails\]/);
+  assert.match(email, /email !== requesterEmail/);
+  assert.match(email, /to: \[recipient\]/);
+  assert.match(email, /waiver-request-\$\{input\.waiverId\}-\$\{recipient\}/);
 });
 
 test("stores screenshot proof and renders real daily progress", async () => {

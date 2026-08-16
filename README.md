@@ -92,6 +92,16 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
+## Transactional email
+
+Completion and waiver-vote notifications use Resend. Configure these server-side environment variables in the deployment:
+
+- `RESEND_API_KEY` (required)
+- `COMMIT_EMAIL_FROM` (recommended; for example, `Commit <notifications@your-verified-domain.com>`)
+- `COMMIT_APP_URL` (optional fallback; request links normally use the current deployed origin)
+
+Resend only delivers to arbitrary users after the sender domain is verified. `onboarding@resend.dev` is suitable only for testing with the email address attached to the Resend account.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

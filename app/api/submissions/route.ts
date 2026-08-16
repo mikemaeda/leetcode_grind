@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   }
   const completedCount = currentCount + 1;
   const completionEmail = completedCount === DAILY_REQUIRED
-    ? await sendCompletionNotification({ commitmentId: commitment.id, memberName: user.name, memberEmail: user.email, date }).catch(error => { console.error("[completion-email] notification failed", { commitmentId: commitment.id, error: error instanceof Error ? error.message : String(error) }); return { sent: false }; })
+    ? await sendCompletionNotification({ commitmentId: commitment.id, memberName: user.name, memberEmail: user.email, date, appUrl: new URL(request.url).origin }).catch(error => { console.error("[completion-email] notification failed", { commitmentId: commitment.id, error: error instanceof Error ? error.message : String(error) }); return { sent: false }; })
     : { sent: false };
   return NextResponse.json({ ok: true, completedCount, completionEmailSent: completionEmail.sent });
 }
