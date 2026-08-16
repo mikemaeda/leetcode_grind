@@ -34,6 +34,6 @@ export async function POST(request: Request) {
     db.update(dailyCommitments).set({ status: "WAIVER_PENDING", waiverId }).where(eq(dailyCommitments.id, commitment.id)),
   ]);
   const activeMembers = await db.select({ email: users.email }).from(groupMembers).innerJoin(users, eq(users.id, groupMembers.userId)).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt)));
-  const email = await sendWaiverNotification({ waiverId, requesterName: user.name, requesterEmail: user.email, memberEmails: activeMembers.map(member => member.email), date, progress: commitment.completedCount, explanation });
+  const email = await sendWaiverNotification({ waiverId, requesterName: user.name, requesterEmail: user.email, memberEmails: activeMembers.map(member => member.email), date, progress: commitment.completedCount, explanation }).catch(error => { console.error("[waiver-email] notification failed", { waiverId, error: error instanceof Error ? error.message : String(error) }); return { sent: false as const, reason: "The request was saved, but its email notification could not be delivered." }; });
   return NextResponse.json({ waiverId, emailSent: email.sent, message: email.sent ? `Waiver requested. ${email.recipientCount} people were notified by email.` : `Waiver requested. ${email.reason}` });
 }

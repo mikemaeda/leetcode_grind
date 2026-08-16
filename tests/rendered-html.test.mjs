@@ -45,6 +45,8 @@ test("stores screenshot proof and renders real daily progress", async () => {
   assert.match(route, /await proof\.file\.arrayBuffer\(\)/);
   assert.match(route, /completedCount: currentCount \+ 1/);
   assert.match(route, /DAILY_REQUIRED/);
+  assert.match(route, /sendCompletionNotification/);
+  assert.match(route, /completedCount === DAILY_REQUIRED/);
   assert.match(app, /Today’s progress is \$\{count\}\/2/);
   assert.match(app, /proof-grid/);
   assert.match(page, /problemSubmissions/);

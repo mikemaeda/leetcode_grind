@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { dailyCommitments, problemSubmissions, proofUploads } from "@/db/schema";
 import { currentUser } from "@/lib/auth/session";
 import { DAILY_REQUIRED, ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
+import { sendCompletionNotification } from "@/lib/email/completion-notification";
 
 const maxUploadBytes = 25 * 1024 * 1024;
 const maxImages = 10;
@@ -49,5 +50,9 @@ export async function POST(request: Request) {
     console.error("[submissions] failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Your proof could not be saved. Please try again." }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, completedCount: currentCount + 1 });
+  const completedCount = currentCount + 1;
+  const completionEmail = completedCount === DAILY_REQUIRED
+    ? await sendCompletionNotification({ commitmentId: commitment.id, memberName: user.name, memberEmail: user.email, date }).catch(error => { console.error("[completion-email] notification failed", { commitmentId: commitment.id, error: error instanceof Error ? error.message : String(error) }); return { sent: false }; })
+    : { sent: false };
+  return NextResponse.json({ ok: true, completedCount, completionEmailSent: completionEmail.sent });
 }
