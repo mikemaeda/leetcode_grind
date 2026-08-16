@@ -2,59 +2,57 @@
 
 import { useEffect, useState } from "react";
 
-type View = "Dashboard" | "My Groups" | "Leaderboard" | "Activity" | "Profile" | "Settings";
-type Modal = "submit" | "waiver" | "join" | "create" | null;
+type View = "Today" | "Members" | "Submissions" | "Payment";
+type Member = { id: string; name: string };
 
-export function AccountabilityApp({ viewerName }: { viewerName: string }) {
-  const [view, setView] = useState<View>("Dashboard");
-  const [modal, setModal] = useState<Modal>(null);
+const initials = (name: string) => name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+
+export function AccountabilityApp({ viewerName, viewerEmail, members }: { viewerName: string; viewerEmail: string; members: Member[] }) {
+  const [view, setView] = useState<View>("Today");
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
   const [toast, setToast] = useState("");
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 3200);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  useEffect(() => { if (!toast) return; const id = window.setTimeout(() => setToast(""), 3200); return () => clearTimeout(id); }, [toast]);
+  async function logout() { await fetch("/api/auth/logout", { method: "POST" }); window.location.reload(); }
 
-  const initials = viewerName.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+  return <div className="grind-shell">
+    <header className="grind-header">
+      <button className="grind-brand" onClick={() => setView("Today")}><span className="brand-mark">C</span><span>Commit</span><small>LEETCODE GRIND</small></button>
+      <nav>{(["Today", "Members", "Submissions", "Payment"] as View[]).map(item => <button key={item} className={view === item ? "active" : ""} onClick={() => setView(item)}>{item}</button>)}</nav>
+      <button className="account-button" onClick={logout}><span className="avatar blue">{initials(viewerName)}</span><span><b>{viewerName}</b><small>Log out</small></span></button>
+    </header>
 
-  return <div className="app-shell">
-    <aside className="sidebar">
-      <button className="brand" onClick={() => setView("Dashboard")} aria-label="Commit dashboard"><span className="brand-mark">C</span><span>commit<span className="brand-dot">.</span></span></button>
-      <nav aria-label="Primary navigation">{(["Dashboard", "My Groups", "Leaderboard", "Activity"] as View[]).map((item) => <button key={item} className={view === item ? "nav-item active" : "nav-item"} onClick={() => setView(item)}><span className="nav-icon">{item === "Dashboard" ? "⌂" : item === "My Groups" ? "♧" : item === "Leaderboard" ? "♛" : "◉"}</span>{item}</button>)}</nav>
-      <div className="side-bottom"><button className={view === "Settings" ? "nav-item active" : "nav-item"} onClick={() => setView("Settings")}><span className="nav-icon">⚙</span>Settings</button><button className={view === "Profile" ? "profile-tile selected" : "profile-tile"} onClick={() => setView("Profile")}><span className="avatar blue">{initials}</span><span><b>{viewerName}</b><small>Commit account</small></span><span className="dots">•••</span></button></div>
-    </aside>
-    <main>
-      <header className="mobile-header"><button className="brand" onClick={() => setView("Dashboard")}><span className="brand-mark">C</span>commit<span className="brand-dot">.</span></button><button className="icon-button" onClick={() => setView("Profile")}>{initials}</button></header>
-      {view === "Dashboard" && <Dashboard name={viewerName} onCreate={() => setModal("create")} onJoin={() => setModal("join")} onViewLeaderboard={() => setView("Leaderboard")} onViewActivity={() => setView("Activity")} />}
-      {view === "My Groups" && <Groups onJoin={() => setModal("join")} onCreate={() => setModal("create")} />}
-      {view === "Leaderboard" && <Leaderboard full />}{view === "Activity" && <Activity full />}
-      {view === "Profile" && <Profile name={viewerName} />}{view === "Settings" && <Settings />}
+    <main className="grind-main">
+      {view === "Today" && <Today name={viewerName.split(" ")[0]} members={members} onSubmit={() => setSubmitOpen(true)} onMembers={() => setView("Members")} />}
+      {view === "Members" && <Members members={members} viewerEmail={viewerEmail} />}
+      {view === "Submissions" && <Submissions />}
+      {view === "Payment" && <Payment onAdd={() => setCardOpen(true)} />}
     </main>
-    <nav className="mobile-nav" aria-label="Mobile navigation">{(["Dashboard", "My Groups", "Leaderboard", "Activity"] as View[]).map((item) => <button key={item} className={view === item ? "active" : ""} onClick={() => setView(item)}><span>{item === "Dashboard" ? "⌂" : item === "My Groups" ? "♧" : item === "Leaderboard" ? "♛" : "◉"}</span><small>{item === "My Groups" ? "Groups" : item}</small></button>)}</nav>
-    {modal && <ModalDialog type={modal} onClose={() => setModal(null)} onSubmit={(event) => event.preventDefault()} onDone={(message) => { setModal(null); setToast(message); }} />}{toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
+
+    {submitOpen && <SubmitDialog onClose={() => setSubmitOpen(false)} onDone={() => { setSubmitOpen(false); setToast("Proof submission is ready for storage connection."); }} />}
+    {cardOpen && <CardDialog onClose={() => setCardOpen(false)} />}
+    {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
   </div>;
 }
 
-function Dashboard({ name, onCreate, onJoin, onViewLeaderboard, onViewActivity }: { name: string; onCreate: () => void; onJoin: () => void; onViewLeaderboard: () => void; onViewActivity: () => void }) {
-  return <div className="page dashboard-page">
-    <section className="welcome"><div><p className="eyebrow">SATURDAY, AUGUST 15</p><h1>Hello {name}, ready to commit?</h1><p>Everything you need for today is below.</p></div></section>
-    <section className="today-card empty-today"><div className="today-head"><div className="group-title"><span className="code-badge">&lt;/&gt;</span><div><p>TODAY</p><h2>No commitment yet</h2></div></div></div><div className="empty-content"><p>You have not created or joined an accountability group. Once you do, today’s commitment, deadline, progress, and penalty terms will appear here.</p><div className="today-actions"><button className="primary" onClick={onCreate}>Create a group</button><button className="outline" onClick={onJoin}>Join with a code</button></div></div></section>
-    <div className="dashboard-bottom"><Leaderboard onView={onViewLeaderboard} /><Activity onView={onViewActivity} /></div>
+function Today({ name, members, onSubmit, onMembers }: { name: string; members: Member[]; onSubmit: () => void; onMembers: () => void }) {
+  return <div className="grind-page"><div className="grind-title"><p>LEETCODE GRIND</p><h1>Hey {name}. Two questions today.</h1><span>Submit proof before 11:59 PM ET.</span></div>
+    <section className="commitment-block">
+      <div className="commitment-main"><p className="label">TODAY’S REQUIREMENT</p><h2>Solve 2 LeetCode questions</h2><div className="big-progress"><strong>0 <span>/ 2</span></strong><div><span style={{ width: "0%" }} /></div></div><p className="quiet">No proof submitted yet.</p><button className="primary" onClick={onSubmit}>Submit question + screenshot</button></div>
+      <dl className="terms-list"><div><dt>Deadline</dt><dd>11:59 PM ET</dd></div><div><dt>Penalty if missed</dt><dd>$10 to each other member</dd></div><div><dt>Waiver cutoff</dt><dd>9:59 PM ET</dd></div></dl>
+    </section>
+    <section className="member-summary"><div className="section-heading"><div><p className="label">THE GROUP</p><h2>Today’s status</h2></div><button className="text-link" onClick={onMembers}>View all members →</button></div>{members.length ? <div className="simple-member-list">{members.slice(0, 5).map(member => <MemberRow member={member} key={member.id} />)}</div> : <div className="calm-empty">No members have joined yet.</div>}</section>
   </div>;
 }
 
-function Leaderboard({ full = false, onView }: { full?: boolean; onView?: () => void }) { return <div className={full ? "page inner-page" : "panel leaderboard-panel"}>{full && <PageTitle eyebrow="LEADERBOARD" title="Leaderboard" subtitle="Real members will appear after they join a group." />}<div className="panel-head"><div><h3>{full ? "Group standings" : "Group progress"}</h3></div>{!full && <button className="text-link" onClick={onView}>View leaderboard →</button>}</div><div className="panel-empty"><p>No members to rank yet.</p><small>Streaks, completion consistency, and problems completed will appear here once a group has real participants.</small></div></div>; }
-function Activity({ full = false, onView }: { full?: boolean; onView?: () => void }) { return <div className={full ? "page inner-page" : "panel activity-panel"}>{full && <PageTitle eyebrow="ACTIVITY" title="Group activity" subtitle="Activity will begin when your group does." />}<div className="panel-head"><div><h3>Recent activity</h3></div>{!full && <button className="text-link" onClick={onView}>See all →</button>}</div><div className="panel-empty"><p>No activity yet.</p><small>Real submissions, completions, and waiver requests will appear here.</small></div></div>; }
+function Members({ members, viewerEmail }: { members: Member[]; viewerEmail: string }) { return <div className="grind-page"><div className="grind-title"><p>LEETCODE GRIND</p><h1>Members</h1><span>{members.length} registered {members.length === 1 ? "member" : "members"} · {viewerEmail}</span></div><section className="plain-section">{members.length ? <div className="simple-member-list">{members.map(member => <MemberRow member={member} key={member.id} />)}</div> : <div className="calm-empty">No members have joined yet.</div>}</section></div>; }
 
-function Groups({ onJoin, onCreate }: { onJoin: () => void; onCreate: () => void }) { return <div className="page inner-page"><PageTitle eyebrow="GROUPS" title="My groups" subtitle="Groups you create or join will appear here." actions={<><button className="outline" onClick={onJoin}>Join with code</button><button className="primary" onClick={onCreate}>＋ Create group</button></>} /><button className="empty-group single-empty" onClick={onCreate}><span>＋</span><b>No groups yet</b><small>Create your first group or join one with an invite code.</small></button></div>; }
-function Profile({ name }: { name: string }) { const initials = name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase(); async function logout() { await fetch("/api/auth/logout", { method: "POST" }); window.location.reload(); } return <div className="page inner-page"><PageTitle eyebrow="PROFILE" title={name} subtitle="Commit account" /><div className="profile-card minimal-profile"><span className="avatar huge blue">{initials}</span><h2>{name}</h2><button className="outline wide" onClick={logout}>Log out</button></div></div>; }
-function Settings() { return <div className="page inner-page"><PageTitle eyebrow="PREFERENCES" title="Settings" subtitle="Keep your account and challenge notifications dialed in." /><div className="settings-card"><Setting title="Daily reminders" copy="Get a nudge when your deadline is getting close." /><Setting title="Group activity" copy="Receive updates when teammates complete or request waivers." /><Setting title="Streak milestones" copy="Celebrate when you or your teammates hit a new streak." /><div className="timezone-row"><div><b>Timezone</b><p>Used for personal display. Group deadlines follow the group timezone.</p></div><select aria-label="Timezone"><option>America/New_York (ET)</option><option>America/Los_Angeles (PT)</option><option>Europe/London (GMT)</option></select></div></div></div>; }
-function Setting({ title, copy }: { title: string; copy: string }) { const [on, setOn] = useState(true); return <div className="setting"><div><b>{title}</b><p>{copy}</p></div><button className={on ? "toggle on" : "toggle"} aria-pressed={on} onClick={() => setOn(!on)}><span /></button></div>; }
-function PageTitle({ eyebrow, title, subtitle, actions }: { eyebrow: string; title: string; subtitle: string; actions?: React.ReactNode }) { return <section className="page-title"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{subtitle}</p></div>{actions && <div className="title-actions">{actions}</div>}</section>; }
+function MemberRow({ member }: { member: Member }) { return <div className="simple-member"><span className="avatar blue">{initials(member.name)}</span><div><b>{member.name}</b><small>0 day streak</small></div><span className="member-progress">0 / 2 today</span><span className="status pending">NOT STARTED</span></div>; }
 
-function ModalDialog({ type, onClose, onSubmit, onDone }: { type: Exclude<Modal, null>; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onDone: (message: string) => void }) {
-  const isSubmit = type === "submit", isWaiver = type === "waiver", isJoin = type === "join";
-  return <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button className="modal-close" onClick={onClose} aria-label="Close">×</button><p className="eyebrow">{isSubmit ? "PROOF OF WORK" : isWaiver ? "WAIVER REQUEST" : isJoin ? "JOIN A CHALLENGE" : "NEW CHALLENGE"}</p><h2 id="modal-title">{isSubmit ? "Submit a problem" : isWaiver ? "Request today’s waiver" : isJoin ? "Enter your invite code" : "Create a group"}</h2><p className="modal-intro">{isSubmit ? "Add the problem and a screenshot of your accepted solution." : isWaiver ? "Requests must be submitted by 9:59 PM and approved by your group." : isJoin ? "Review the stakes before you commit." : "Set a clear goal and fair consequences for the whole crew."}</p>
-    {isSubmit ? <form onSubmit={onSubmit} className="form"><label>Problem title<input required placeholder="e.g. Two Sum" /></label><label>LeetCode URL<input required type="url" placeholder="https://leetcode.com/problems/..." /></label><label>Screenshot proof<span className="upload"><input required type="file" accept="image/*" /><b>↑ Upload accepted solution</b><small>PNG, JPG, or WEBP · max 8 MB</small></span></label><label>Notes <small>OPTIONAL</small><textarea placeholder="What clicked for you?" /></label><button className="primary wide" type="submit">Submit problem →</button></form> : isWaiver ? <form className="form" onSubmit={(e) => { e.preventDefault(); onDone("Waiver requested — your group can now vote."); }}><label>Reason<select required defaultValue=""><option value="" disabled>Choose a category</option><option>Illness</option><option>Emergency</option><option>Travel</option><option>Exam / Academic Conflict</option><option>Personal</option><option>Other</option></select></label><label>What’s going on?<textarea required placeholder="Give your group enough context to vote fairly." /></label><div className="notice">⏱ Submitted 2+ hours before the deadline. Group approval is still required.</div><button className="primary wide" type="submit">Send waiver request</button></form> : isJoin ? <form className="form" onSubmit={(e) => { e.preventDefault(); onDone("Invite accepted — welcome to the challenge!"); }}><label>Invite code<input required placeholder="e.g. GRIND-24" /></label><div className="agreement"><div><span className="code-badge small-code">$</span><div><b>Penalty agreement</b><p>Penalty per participant: <strong>$10</strong><br />Other participants: <strong>3</strong><br />If you miss today’s commitment, you will owe <strong>$30 total</strong>.</p></div></div><div className="max-penalty"><span>Maximum penalty for one missed day</span><strong>$30</strong></div><label className="checkbox"><input required type="checkbox" /> I understand and explicitly agree to this penalty structure.</label></div><button className="primary wide" type="submit">Agree & join group</button></form> : <form className="form" onSubmit={(e) => { e.preventDefault(); onDone("Group created — your invite code is ready!"); }}><label>Group name<input required placeholder="e.g. LeetCode Grind" /></label><div className="form-row"><label>Problems per day<input required type="number" min="1" defaultValue="2" /></label><label>Penalty per member<input required type="number" min="0" defaultValue="10" /></label></div><label>Daily deadline<input required type="time" defaultValue="23:59" /></label><div className="notice">Payments are simulated in this development version. No real cards are charged.</div><button className="primary wide" type="submit">Create group</button></form>}
-  </section></div>;
-}
+function Submissions() { return <div className="grind-page"><div className="grind-title"><p>PROOF</p><h1>Submissions</h1><span>Open a member to review the two screenshots they submitted today.</span></div><section className="plain-section"><div className="calm-empty"><b>No screenshots submitted today.</b><span>Accepted LeetCode proof will appear here under the member who submitted it.</span></div></section></div>; }
+
+function Payment({ onAdd }: { onAdd: () => void }) { return <div className="grind-page"><div className="grind-title"><p>PAYMENT</p><h1>Penalty payment method</h1><span>A valid card is required before participating in the grind.</span></div><section className="payment-section"><div><h2>No card on file</h2><p>Your card is only used if you miss both required LeetCode submissions and do not have an approved waiver.</p><button className="primary" onClick={onAdd}>Add card securely</button></div><dl className="terms-list"><div><dt>Penalty</dt><dd>$10 per other member</dd></div><div><dt>Card storage</dt><dd>Handled by payment provider</dd></div><div><dt>Commit stores</dt><dd>Brand, last 4, provider token</dd></div></dl></section><p className="security-copy">Commit never stores full card numbers, security codes, or magnetic-stripe data.</p></div>; }
+
+function SubmitDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose()}><section className="modal"><button className="modal-close" onClick={onClose}>×</button><p className="eyebrow">SUBMIT PROOF</p><h2>LeetCode question</h2><p className="modal-intro">Submit one accepted question and its screenshot. You need two valid submissions today.</p><form className="form" onSubmit={e => { e.preventDefault(); onDone(); }}><label>Question title<input required placeholder="Question name" /></label><label>LeetCode URL<input required type="url" placeholder="https://leetcode.com/problems/..." /></label><label>Accepted screenshot<span className="upload"><input required type="file" accept="image/png,image/jpeg,image/webp" /><b>Choose screenshot</b><small>PNG, JPG, or WEBP</small></span></label><button className="primary wide">Submit proof</button></form></section></div>; }
+
+function CardDialog({ onClose }: { onClose: () => void }) { return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose()}><section className="modal"><button className="modal-close" onClick={onClose}>×</button><p className="eyebrow">SECURE CARD SETUP</p><h2>Connect payment provider</h2><p className="modal-intro">Card entry will appear here through the payment provider’s secure hosted fields after the provider account is connected. Commit will not create ordinary inputs for card numbers or CVVs.</p><div className="notice">Stripe or another PCI-compliant payment provider must be configured before live card details can be accepted.</div><button className="outline wide" onClick={onClose}>Close</button></section></div>; }

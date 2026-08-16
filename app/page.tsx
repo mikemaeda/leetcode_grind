@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { AccountabilityApp } from "./AccountabilityApp";
 import { AuthScreen } from "./AuthScreen";
 import { currentUser } from "@/lib/auth/session";
+import { getDb } from "@/db";
+import { users } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -13,5 +15,6 @@ export const metadata: Metadata = {
 export default async function Home() {
   const user = await currentUser();
   if (!user) return <AuthScreen />;
-  return <AccountabilityApp viewerName={user.name.split(" ")[0]} />;
+  const registeredUsers = await getDb().select({ id: users.id, name: users.name }).from(users);
+  return <AccountabilityApp viewerName={user.name} viewerEmail={user.email} members={registeredUsers} />;
 }
