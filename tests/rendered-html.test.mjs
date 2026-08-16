@@ -29,6 +29,8 @@ test("requires a 300-word waiver and unanimous member approval", async () => {
   assert.match(requestRoute, /wordCount\(explanation\) < 300/);
   assert.match(requestRoute, /sendWaiverNotification/);
   assert.match(voteRoute, /waiver\.requesterId === user\.id/);
+  assert.match(voteRoute, /sendWaiverAcceptedNotification/);
+  assert.match(voteRoute, /previousVote !== "APPROVE"/);
   assert.match(voteRoute, /eligibleVoterIds\.every/);
   assert.match(app, /\/ 300 words/);
   assert.match(app, /Every other active member must approve/);

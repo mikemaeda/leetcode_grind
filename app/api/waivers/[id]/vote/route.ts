@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { currentUser } from "@/lib/auth/session";
 import { getDb } from "@/db";
-import { dailyCommitments, groupMembers, waiverRequests, waiverVotes } from "@/db/schema";
+import { dailyCommitments, groupMembers, users, waiverRequests, waiverVotes } from "@/db/schema";
 import { ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
+import { sendWaiverAcceptedNotification } from "@/lib/email/waiver-accepted-notification";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
@@ -20,6 +21,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const eligible = await db.select({ userId: groupMembers.userId }).from(groupMembers).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt)));
   if (!eligible.some(member => member.userId === user.id)) return NextResponse.json({ error: "Only active group members can vote." }, { status: 403 });
 
+  const previousVote = (await db.select({ vote: waiverVotes.vote }).from(waiverVotes).where(and(eq(waiverVotes.waiverId, id), eq(waiverVotes.voterId, user.id))).limit(1))[0]?.vote;
   const now = new Date().toISOString();
   await db.insert(waiverVotes).values({ id: crypto.randomUUID(), waiverId: id, voterId: user.id, vote: input.vote, createdAt: now }).onConflictDoUpdate({ target: [waiverVotes.waiverId, waiverVotes.voterId], set: { vote: input.vote, createdAt: now } });
   const votes = await db.select({ voterId: waiverVotes.voterId, vote: waiverVotes.vote }).from(waiverVotes).where(eq(waiverVotes.waiverId, id));
@@ -33,5 +35,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       db.update(dailyCommitments).set({ status: status === "APPROVED" ? "WAIVED" : "PENDING" }).where(eq(dailyCommitments.id, waiver.commitmentId)),
     ]);
   }
-  return NextResponse.json({ status, approvals: votes.filter(vote => vote.vote === "APPROVE" && eligibleVoterIds.includes(vote.voterId)).length, required: eligibleVoterIds.length });
+  let requesterNotified = false;
+  if (input.vote === "APPROVE" && previousVote !== "APPROVE") {
+    const requester = (await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, waiver.requesterId)).limit(1))[0];
+    if (requester) {
+      const notification = await sendWaiverAcceptedNotification({ waiverId: id, requesterId: requester.id, requesterName: requester.name, requesterEmail: requester.email, voterId: user.id, voterName: user.name, date: waiver.date, appUrl: new URL(request.url).origin }).catch(error => {
+        console.error("[waiver-accepted-email] notification failed", { waiverId: id, voterId: user.id, error: error instanceof Error ? error.message : String(error) });
+        return { sent: false as const };
+      });
+      requesterNotified = notification.sent;
+    }
+  }
+  return NextResponse.json({ status, approvals: votes.filter(vote => vote.vote === "APPROVE" && eligibleVoterIds.includes(vote.voterId)).length, required: eligibleVoterIds.length, requesterNotified });
 }
