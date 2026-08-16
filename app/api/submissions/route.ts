@@ -31,7 +31,13 @@ export async function POST(request: Request) {
     const extension = (file.type.split("/")[1] ?? "img").replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "").slice(0, 12) || "img";
     return { id, file, objectKey: `${date}/${user.id}/${id}.${extension}` };
   });
-  await Promise.all(proofs.map(proof => env.PROOFS.put(proof.objectKey, proof.file.arrayBuffer(), { httpMetadata: { contentType: proof.file.type } })));
+  try {
+    await Promise.all(proofs.map(async proof => env.PROOFS.put(proof.objectKey, await proof.file.arrayBuffer(), { httpMetadata: { contentType: proof.file.type } })));
+  } catch (error) {
+    await Promise.all(proofs.map(proof => env.PROOFS.delete(proof.objectKey)));
+    console.error("[submissions/storage] failed", { error: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: "The screenshot could not be stored. Please try again." }, { status: 500 });
+  }
   try {
     await db.batch([
       db.insert(problemSubmissions).values({ id: submissionId, commitmentId: commitment.id, userId: user.id, problemTitle, leetcodeUrl: "", notes: null, submittedAt }),

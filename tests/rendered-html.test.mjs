@@ -22,6 +22,7 @@ test("stores screenshot proof and renders real daily progress", async () => {
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(route, /env\.PROOFS\.put/);
+  assert.match(route, /await proof\.file\.arrayBuffer\(\)/);
   assert.match(route, /completedCount: currentCount \+ 1/);
   assert.match(route, /DAILY_REQUIRED/);
   assert.match(app, /Today’s progress is \$\{count\}\/2/);
