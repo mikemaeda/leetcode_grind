@@ -6,6 +6,7 @@ import { dailyCommitments, problemSubmissions, proofUploads } from "@/db/schema"
 import { currentUser } from "@/lib/auth/session";
 import { DAILY_REQUIRED, ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
 import { sendCompletionNotification } from "@/lib/email/completion-notification";
+import { paymentCommitmentStatus } from "@/lib/payments/commitment-status";
 
 const maxUploadBytes = 25 * 1024 * 1024;
 const maxImages = 10;
@@ -13,6 +14,8 @@ const maxImages = 10;
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in to submit proof." }, { status: 401 });
+  const paymentSetup = await paymentCommitmentStatus(user.id);
+  if (!paymentSetup.complete) return NextResponse.json({ error: "Complete both card and payout setup before submitting LeetCode proof.", paymentSetup }, { status: 403 });
   const { date } = await ensureLeetcodeMembership(user);
   const form = await request.formData();
   const problemTitle = String(form.get("problemTitle") ?? "").trim();

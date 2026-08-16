@@ -86,3 +86,20 @@ test("keeps successful actions on the current view with confirmation", async () 
   assert.doesNotMatch(app, /setTimeout\(\(\) => window\.location\.reload/);
   assert.match(app, /success-toast/);
 });
+
+test("requires card and payout setup before proof submission", async () => {
+  const [status, route, page, app] = await Promise.all([
+    readFile(new URL("../lib/payments/commitment-status.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/submissions/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/AccountabilityApp.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(status, /paymentMethods\.status, "ACTIVE"/);
+  assert.match(status, /payoutsEnabled/);
+  assert.match(status, /complete: hasCard && payoutsReady/);
+  assert.match(route, /if \(!paymentSetup\.complete\)/);
+  assert.match(route, /status: 403/);
+  assert.match(page, /paymentSetup=\{paymentSetup\}/);
+  assert.match(app, /Commitment setup incomplete/);
+  assert.match(app, /Unlock submissions/);
+});
