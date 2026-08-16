@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     }
     let accountId = profile.connectedAccountId;
     if (!accountId) {
-      const account = await stripe.accounts.create({ type: "standard", email: user.email, capabilities: { transfers: { requested: true } }, metadata: { commitUserId: user.id } }, { idempotencyKey: `commit-connect-${user.id}` });
+      const account = await stripe.accounts.create({ type: "standard", email: user.email, capabilities: { transfers: { requested: true } }, metadata: { commitUserId: user.id } }, { idempotencyKey: `commit-connect-standard-v1-${user.id}` });
       accountId = account.id;
       await db.update(paymentProfiles).set({ connectedAccountId: accountId, updatedAt: new Date().toISOString() }).where(eq(paymentProfiles.userId, user.id));
     }
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       link = await stripe.accountLinks.create({ account: accountId, refresh_url: `${origin}/?payment=refresh`, return_url: `${origin}/?payment=connected`, type: "account_onboarding" });
     } catch (error) {
       if (!isStripeModeMismatch(error)) throw error;
-      const account = await stripe.accounts.create({ type: "standard", email: user.email, capabilities: { transfers: { requested: true } }, metadata: { commitUserId: user.id } }, { idempotencyKey: `commit-connect-${user.id}` });
+      const account = await stripe.accounts.create({ type: "standard", email: user.email, capabilities: { transfers: { requested: true } }, metadata: { commitUserId: user.id } }, { idempotencyKey: `commit-connect-standard-v1-${user.id}` });
       accountId = account.id;
       await db.update(paymentProfiles).set({ connectedAccountId: accountId, chargesEnabled: false, payoutsEnabled: false, updatedAt: new Date().toISOString() }).where(eq(paymentProfiles.userId, user.id));
       link = await stripe.accountLinks.create({ account: accountId, refresh_url: `${origin}/?payment=refresh`, return_url: `${origin}/?payment=connected`, type: "account_onboarding" });
