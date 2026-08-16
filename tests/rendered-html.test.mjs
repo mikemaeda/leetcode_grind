@@ -16,10 +16,11 @@ test("requires explicit commitment terms during authentication", async () => {
 });
 
 test("requires a 300-word waiver and unanimous member approval", async () => {
-  const [requestRoute, voteRoute, app] = await Promise.all([
+  const [requestRoute, voteRoute, app, email] = await Promise.all([
     readFile(new URL("../app/api/waivers/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/waivers/[id]/vote/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/AccountabilityApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/email/waiver-notification.ts", import.meta.url), "utf8"),
   ]);
   assert.match(requestRoute, /wordCount\(explanation\) < 300/);
   assert.match(requestRoute, /sendWaiverNotification/);
@@ -29,6 +30,9 @@ test("requires a 300-word waiver and unanimous member approval", async () => {
   assert.match(app, /Every other active member must approve/);
   assert.match(app, /Today is complete/);
   assert.match(app, /!complete && <button className="primary" onClick=\{onRequest\}/);
+  assert.match(requestRoute, /activeMembers\.map\(member => member\.email\)/);
+  assert.match(email, /bcc: memberCopies/);
+  assert.match(email, /new Set\(\[WAIVER_INBOX, \.\.\.input\.memberEmails\]/);
 });
 
 test("stores screenshot proof and renders real daily progress", async () => {

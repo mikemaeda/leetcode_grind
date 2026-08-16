@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { currentUser } from "@/lib/auth/session";
 import { getDb } from "@/db";
-import { dailyCommitments, waiverRequests } from "@/db/schema";
+import { dailyCommitments, groupMembers, users, waiverRequests } from "@/db/schema";
 import { canRequestWaiver } from "@/lib/domain/commitments";
 import { ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
 import { sendWaiverNotification } from "@/lib/email/waiver-notification";
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     db.insert(waiverRequests).values({ id: waiverId, requesterId: user.id, groupId: LEETCODE_GROUP_ID, commitmentId: commitment.id, date, reasonCategory: "Unable to complete today", explanation, submittedAt, status: "PENDING" }),
     db.update(dailyCommitments).set({ status: "WAIVER_PENDING", waiverId }).where(eq(dailyCommitments.id, commitment.id)),
   ]);
-  const email = await sendWaiverNotification({ waiverId, requesterName: user.name, requesterEmail: user.email, date, progress: commitment.completedCount, explanation });
-  return NextResponse.json({ waiverId, emailSent: email.sent, message: email.sent ? "Waiver requested. The group must now approve it." : `Waiver requested. ${email.reason}` });
+  const activeMembers = await db.select({ email: users.email }).from(groupMembers).innerJoin(users, eq(users.id, groupMembers.userId)).where(and(eq(groupMembers.groupId, LEETCODE_GROUP_ID), isNull(groupMembers.leftAt)));
+  const email = await sendWaiverNotification({ waiverId, requesterName: user.name, requesterEmail: user.email, memberEmails: activeMembers.map(member => member.email), date, progress: commitment.completedCount, explanation });
+  return NextResponse.json({ waiverId, emailSent: email.sent, message: email.sent ? `Waiver requested. ${email.recipientCount} people were notified by email.` : `Waiver requested. ${email.reason}` });
 }
