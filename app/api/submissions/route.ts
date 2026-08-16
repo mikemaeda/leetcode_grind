@@ -6,9 +6,8 @@ import { dailyCommitments, problemSubmissions, proofUploads } from "@/db/schema"
 import { currentUser } from "@/lib/auth/session";
 import { DAILY_REQUIRED, ensureLeetcodeMembership, LEETCODE_GROUP_ID } from "@/lib/domain/leetcode-group";
 
-const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"]);
-const maxImageBytes = 10 * 1024 * 1024;
-const maxImages = 3;
+const maxUploadBytes = 25 * 1024 * 1024;
+const maxImages = 10;
 
 export async function POST(request: Request) {
   const user = await currentUser();
@@ -18,7 +17,7 @@ export async function POST(request: Request) {
   const problemTitle = String(form.get("problemTitle") ?? "").trim();
   const screenshots = form.getAll("screenshots").filter((value): value is File => value instanceof File && value.size > 0);
   if (!problemTitle) return NextResponse.json({ error: "Enter the LeetCode question title." }, { status: 400 });
-  if (!screenshots.length || screenshots.length > maxImages || screenshots.some(file => !allowedTypes.has(file.type) || file.size > maxImageBytes)) return NextResponse.json({ error: "Choose 1–3 PNG, JPG, WEBP, GIF, or AVIF images, up to 10 MB each." }, { status: 400 });
+  if (!screenshots.length || screenshots.length > maxImages || screenshots.some(file => !file.type.startsWith("image/")) || screenshots.reduce((total, file) => total + file.size, 0) > maxUploadBytes) return NextResponse.json({ error: "Choose image files totaling less than 25 MB." }, { status: 400 });
   const db = getDb();
   const commitment = (await db.select({ id: dailyCommitments.id }).from(dailyCommitments).where(and(eq(dailyCommitments.userId, user.id), eq(dailyCommitments.groupId, LEETCODE_GROUP_ID), eq(dailyCommitments.date, date))).limit(1))[0];
   if (!commitment) return NextResponse.json({ error: "Today’s commitment could not be created." }, { status: 500 });
@@ -29,7 +28,7 @@ export async function POST(request: Request) {
   const submittedAt = new Date().toISOString();
   const proofs = screenshots.map(file => {
     const id = crypto.randomUUID();
-    const extension = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "img";
+    const extension = (file.type.split("/")[1] ?? "img").replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "").slice(0, 12) || "img";
     return { id, file, objectKey: `${date}/${user.id}/${id}.${extension}` };
   });
   await Promise.all(proofs.map(proof => env.PROOFS.put(proof.objectKey, proof.file.arrayBuffer(), { httpMetadata: { contentType: proof.file.type } })));
